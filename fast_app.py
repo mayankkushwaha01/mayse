@@ -281,9 +281,10 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    import os
     init_db()
-    print("Starting Fast Attendance System...")
-    print("Student Portal: http://localhost:5000")
-    print("Admin Portal: http://localhost:5000/admin")
+    port = int(os.environ.get('PORT', 5000))
+    print("Starting Shambhunath College Attendance System...")
+    print(f"Running on port: {port}")
     print("Admin Password: Mayank#0069")
-    app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)
+    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)
