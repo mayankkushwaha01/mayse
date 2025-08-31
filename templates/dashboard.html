@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 24px;
+        }
+        h3 {
+            color: #666;
+            font-weight: normal;
+            font-size: 16px;
+        }
+        .attendance-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .attendance-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+        }
+        .input-group {
+            margin: 30px 0;
+        }
+        input {
+            width: 100%;
+            padding: 18px;
+            border: 2px solid #e1e5e9;
+            border-radius: 15px;
+            font-size: 18px;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        input:focus {
+            outline: none;
+            border-color: #28a745;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 10px 0;
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(40, 167, 69, 0.3);
+        }
+        .btn-secondary {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(108, 117, 125, 0.3);
+        }
+        #result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+        }
+        #result.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .student-info {
+            margin-bottom: 30px;
+        }
+        .info-card {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .student-avatar {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            flex-shrink: 0;
+        }
+        .student-details {
+            flex: 1;
+        }
+        .student-name {
+            color: #333;
+            font-size: 22px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .student-id {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        .datetime-info {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .date-display, .time-display {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+        }
+        .time-display {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            font-weight: 600;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #495057;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e1e5e9;
+        }
+        .divider span {
+            background: white;
+            padding: 0 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        .btn-qr {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-qr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(23, 162, 184, 0.3);
+        }
+        @media (max-width: 600px) {
+            .info-card {
+                flex-direction: column;
+                text-align: center;
+            }
+            .datetime-info {
+                justify-content: center;
+            }
+
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">SC</div>
+            <h2>Student Dashboard</h2>
+            <h3>Welcome to Attendance System</h3>
+        </div>
+        
+        <div class="student-info">
+            <div class="info-card">
+                <div class="student-avatar">👨‍🎓</div>
+                <div class="student-details">
+                    <h3 class="student-name">{{ student_name }}</h3>
+                    <p class="student-id">ID: {{ student_id }}</p>
+                    <div class="datetime-info">
+                        <div class="date-display" id="currentDate"></div>
+                        <div class="time-display" id="currentTime"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="attendance-card">
+            <div class="attendance-icon">📋</div>
+            <h3 style="color: #333; margin-bottom: 10px;">Mark Your Attendance</h3>
+            <div id="current-subject" style="background: linear-gradient(135deg, #e3f2fd, #bbdefb); padding: 15px; border-radius: 10px; margin: 10px 0 20px; color: #1976d2; font-weight: 600; border-left: 4px solid #1976d2; line-height: 1.5;">Loading current session...</div>
+            <p style="color: #666; margin-bottom: 30px;">Enter Session ID to mark attendance</p>
+            
+            <div class="input-group">
+                <input type="text" id="session_input" placeholder="Enter Session ID" maxlength="8">
+            </div>
+            
+            <button class="btn-primary" onclick="markAttendance()">✓ Mark Attendance</button>
+            
+            <div id="result"></div>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="todayCount">0</div>
+                    <div class="stat-label">Today's Sessions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCount">0</div>
+                    <div class="stat-label">Total Attended</div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn-secondary" onclick="logout()">🚪 Logout</button>
+    </div>
+    
+    <script>
+        function markAttendance() {
+            const sessionId = document.getElementById('session_input').value.trim();
+            if (!sessionId) {
+                showResult('⚠️ Please enter a valid session ID', 'error');
+                return;
+            }
+            
+            // Add loading state
+            const button = document.querySelector('.btn-primary');
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Marking...';
+            button.disabled = true;
+            
+            fetch('/mark_attendance', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({session_id: sessionId})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult('✅ ' + data.success, 'success');
+                    document.getElementById('session_input').value = '';
+                    updateStats();
+                } else {
+                    showResult('❌ ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showResult('❌ Connection error. Please try again.', 'error');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        function showResult(message, type) {
+            const result = document.getElementById('result');
+            result.textContent = message;
+            result.className = type + ' show';
+            
+            setTimeout(() => {
+                result.classList.remove('show');
+            }, 5000);
+        }
+        
+        function updateStats() {
+            fetch('/get_attendance_stats')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    document.getElementById('todayCount').textContent = data.today;
+                    document.getElementById('totalCount').textContent = data.total;
+                }
+            })
+            .catch(error => console.log('Stats update failed'));
+        }
+        
+        function updateCurrentSubject() {
+            fetch('/get_current_session')
+            .then(response => response.json())
+            .then(data => {
+                if (data.session_id) {
+                    document.getElementById('current-subject').innerHTML = 
+                        `📚 <strong>Current Subject:</strong> ${data.subject}<br>
+                         🆔 <strong>Session ID:</strong> <code style="background: white; padding: 3px 6px; border-radius: 4px; font-family: monospace; color: #dc3545;">${data.session_id}</code>`;
+                } else {
+                    document.getElementById('current-subject').textContent = 
+                        '📚 Current Subject: No active session';
+                }
+            })
+            .catch(error => {
+                document.getElementById('current-subject').textContent = 
+                    '📚 Current Subject: No active session';
+            });
+        }
+        
+
+        
+        function updateDateTime() {
+            const now = new Date();
+            const dateOptions = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            };
+            
+            document.getElementById('currentDate').textContent = 
+                now.toLocaleDateString('en-US', dateOptions);
+            document.getElementById('currentTime').textContent = 
+                now.toLocaleTimeString('en-US', timeOptions);
+        }
+        
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/logout';
+            }
+        }
+        
+        // Add enter key support
+        document.addEventListener('DOMContentLoaded', function() {
+            const sessionInput = document.getElementById('session_input');
+            if (sessionInput) {
+                sessionInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        markAttendance();
+                    }
+                });
+            }
+        });
+        
+        // Add page load animation and initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s ease';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+            
+            // Initialize date/time and stats
+            updateDateTime();
+            updateStats();
+            updateCurrentSubject();
+            
+            // Update time every second
+            setInterval(updateDateTime, 1000);
+            
+            // Update stats every 30 seconds
+            setInterval(updateStats, 30000);
+            
+            // Update current subject every 30 seconds
+            setInterval(updateCurrentSubject, 30000);
+        });
+    </script>
+</body>
+</html>

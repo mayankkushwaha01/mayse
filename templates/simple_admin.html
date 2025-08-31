@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - Session Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .admin-logo {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 26px;
+        }
+        h3 {
+            color: #666;
+            font-weight: normal;
+            font-size: 16px;
+        }
+        .admin-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .generate-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+        }
+        .btn-generate {
+            padding: 20px 40px;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 20px 0;
+        }
+        .btn-generate:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 123, 255, 0.3);
+        }
+        #session-info {
+            margin: 30px 0;
+            padding: 30px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            border: none;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+        #session-info.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .session-id {
+            font-size: 36px;
+            font-weight: bold;
+            color: #007bff;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            letter-spacing: 3px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .session-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .detail-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        .detail-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .detail-value {
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+        .copy-btn:hover {
+            background: #218838;
+            transform: translateY(-1px);
+        }
+        .admin-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 10px;
+            text-align: center;
+        }
+        .admin-welcome {
+            display: block;
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        .login-time {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .admin-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .logout-btn {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(220, 53, 69, 0.3);
+        }
+        .back-btn {
+            background: linear-gradient(135deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(108, 117, 125, 0.3);
+        }
+        @media (max-width: 600px) {
+            .admin-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="admin-logo">🔑</div>
+            <h2>Admin Panel</h2>
+            <h3>Shambhunath College of Education</h3>
+            <div class="admin-info">
+                <span class="admin-welcome">Welcome, Administrator</span>
+                <span class="login-time" id="loginTime"></span>
+            </div>
+        </div>
+        
+        <div class="admin-card">
+            <div class="generate-icon">⚙️</div>
+            <h3 style="color: #333; margin-bottom: 15px;">Session Management</h3>
+            <p style="color: #666; margin-bottom: 30px;">Generate unique session IDs for live classes</p>
+            
+            <button class="btn-generate" onclick="generateSession()">
+                ✨ Generate New Session
+            </button>
+            
+            <div id="session-info"></div>
+        </div>
+        
+        <div class="admin-actions">
+            <button class="logout-btn" onclick="logout()">
+                🚪 Logout
+            </button>
+            <button class="back-btn" onclick="window.location.href='/'">
+                ← Back to Student Login
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        function generateSession() {
+            const button = document.querySelector('.btn-generate');
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Generating...';
+            button.disabled = true;
+            
+            fetch('/generate_session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                const dateString = now.toLocaleDateString();
+                
+                document.getElementById('session-info').innerHTML = 
+                    `<h3 style="color: #28a745; margin-bottom: 20px;">✅ Session Created Successfully!</h3>
+                     <p style="color: #666; margin-bottom: 15px;">Share this Session ID with your students:</p>
+                     <div class="session-id">${data.session_id}</div>
+                     <button class="copy-btn" onclick="copySessionId('${data.session_id}')">
+                         📋 Copy Session ID
+                     </button>
+                     <div class="session-details">
+                         <div class="detail-card">
+                             <div class="detail-label">Created Time</div>
+                             <div class="detail-value">${timeString}</div>
+                         </div>
+                         <div class="detail-card">
+                             <div class="detail-label">Date</div>
+                             <div class="detail-value">${dateString}</div>
+                         </div>
+                     </div>
+                     <p style="color: #666; margin-top: 20px; font-size: 14px;">
+                         Students can use this ID to mark their attendance
+                     </p>`;
+                
+                document.getElementById('session-info').classList.add('show');
+            })
+            .catch(error => {
+                alert('Error generating session. Please try again.');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        function copySessionId(sessionId) {
+            navigator.clipboard.writeText(sessionId).then(() => {
+                const copyBtn = document.querySelector('.copy-btn');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✓ Copied!';
+                copyBtn.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.style.background = '#28a745';
+                }, 2000);
+            }).catch(() => {
+                alert('Session ID: ' + sessionId);
+            });
+        }
+        
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/admin_logout';
+            }
+        }
+        
+        function updateLoginTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString();
+            document.getElementById('loginTime').textContent = 'Logged in: ' + timeString;
+        }
+        
+        // Add page load animation
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.querySelector('.container');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(30px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s ease';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+            
+            // Update login time
+            updateLoginTime();
+        });
+    </script>
+</body>
+</html>
