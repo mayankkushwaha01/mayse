@@ -15,14 +15,30 @@ app.secret_key = 'shambhunath_college_secret'
 # Heavy load optimizations
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Thread pool for database operations
-executor = ThreadPoolExecutor(max_workers=20)
+# Thread pool for database operations (increased for concurrent logins)
+executor = ThreadPoolExecutor(max_workers=50)
 
-# Connection pool
-connection_pool = queue.Queue(maxsize=10)
-for _ in range(10):
-    connection_pool.put(sqlite3.connect('/tmp/attendance.db', check_same_thread=False))
+# Login cache for faster authentication
+login_cache = {}
+login_cache_lock = threading.Lock()
+cache_timeout = 300  # 5 minutes
+
+# Active sessions tracking
+active_sessions = {}
+session_lock = threading.Lock()
+
+# Connection pool (increased for concurrent users)
+connection_pool = queue.Queue(maxsize=20)
+for _ in range(20):
+    conn = sqlite3.connect('/tmp/attendance.db', check_same_thread=False)
+    conn.execute('PRAGMA journal_mode=WAL')  # Better concurrency
+    conn.execute('PRAGMA synchronous=NORMAL')  # Faster writes
+    conn.execute('PRAGMA cache_size=10000')  # More cache
+    connection_pool.put(conn)
 
 # Batch processing
 batch_queue = queue.Queue()
@@ -33,7 +49,38 @@ def get_db_connection():
     try:
         return connection_pool.get(timeout=2)
     except queue.Empty:
-        return sqlite3.connect('/tmp/attendance.db', check_same_thread=False)
+        conn = sqlite3.connect('/tmp/attendance.db', check_same_thread=False)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        return conn
+
+def cleanup_expired_cache():
+    """Clean expired login cache entries"""
+    while True:
+        current_time = time.time()
+        with login_cache_lock:
+            expired_keys = [k for k, v in login_cache.items() 
+                          if current_time - v['timestamp'] > cache_timeout]
+            for key in expired_keys:
+                del login_cache[key]
+        time.sleep(60)  # Clean every minute
+
+def track_user_session(student_id, action='login'):
+    """Track active user sessions"""
+    with session_lock:
+        if action == 'login':
+            active_sessions[student_id] = {
+                'login_time': datetime.now().isoformat(),
+                'last_activity': datetime.now().isoformat()
+            }
+        elif action == 'logout' and student_id in active_sessions:
+            del active_sessions[student_id]
+        elif action == 'activity' and student_id in active_sessions:
+            active_sessions[student_id]['last_activity'] = datetime.now().isoformat()
+
+# Start cache cleanup thread
+cache_cleanup_thread = threading.Thread(target=cleanup_expired_cache, daemon=True)
+cache_cleanup_thread.start()
 
 def return_db_connection(conn):
     try:
@@ -113,23 +160,49 @@ def index():
 @app.route('/login', methods=['POST'])
 def login():
     student_id = request.form['student_id']
-    password = hashlib.md5(request.form['password'].encode()).hexdigest()
+    password = request.form['password']
+    password_hash = hashlib.md5(password.encode()).hexdigest()
+    
+    # Check login cache first
+    cache_key = f"{student_id}:{password_hash}"
+    with login_cache_lock:
+        if cache_key in login_cache:
+            cache_entry = login_cache[cache_key]
+            if time.time() - cache_entry['timestamp'] < cache_timeout:
+                session['student_id'] = student_id
+                session['student_name'] = cache_entry['name']
+                session.permanent = True
+                track_user_session(student_id, 'login')
+                return redirect(url_for('dashboard'))
     
     def db_operation():
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM students WHERE id=? AND password=?", (student_id, password))
+        c.execute("SELECT id, name FROM students WHERE id=? AND password=?", (student_id, password_hash))
         user = c.fetchone()
         return_db_connection(conn)
         return user
     
     future = executor.submit(db_operation)
-    user = future.result(timeout=5)
+    try:
+        user = future.result(timeout=3)
+        
+        if user:
+            # Cache successful login
+            with login_cache_lock:
+                login_cache[cache_key] = {
+                    'name': user[1],
+                    'timestamp': time.time()
+                }
+            
+            session['student_id'] = student_id
+            session['student_name'] = user[1]
+            session.permanent = True
+            track_user_session(student_id, 'login')
+            return redirect(url_for('dashboard'))
+    except Exception as e:
+        print(f"Login error: {e}")
     
-    if user:
-        session['student_id'] = student_id
-        session.permanent = True
-        return redirect(url_for('dashboard'))
     return redirect(url_for('index'))
 
 @app.route('/register', methods=['POST'])
@@ -138,11 +211,26 @@ def register():
     password = hashlib.md5(request.form['password'].encode()).hexdigest()
     name = request.form['name']
     
-    conn = sqlite3.connect('/tmp/attendance.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO students VALUES (?, ?, ?)", (student_id, password, name))
-    conn.commit()
-    conn.close()
+    def db_operation():
+        conn = get_db_connection()
+        c = conn.cursor()
+        try:
+            c.execute("INSERT INTO students VALUES (?, ?, ?)", (student_id, password, name))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            return_db_connection(conn)
+    
+    future = executor.submit(db_operation)
+    try:
+        success = future.result(timeout=3)
+        if not success:
+            # Student ID already exists
+            return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Registration error: {e}")
     
     return redirect(url_for('index'))
 
@@ -151,14 +239,29 @@ def dashboard():
     if 'student_id' not in session:
         return redirect(url_for('index'))
     
-    conn = sqlite3.connect('/tmp/attendance.db')
-    c = conn.cursor()
-    c.execute("SELECT name FROM students WHERE id=?", (session['student_id'],))
-    student = c.fetchone()
-    conn.close()
+    student_id = session['student_id']
+    track_user_session(student_id, 'activity')
     
-    student_name = student[0] if student else 'Student'
-    return render_template('dashboard.html', student_name=student_name, student_id=session['student_id'])
+    # Use cached name if available
+    if 'student_name' in session:
+        student_name = session['student_name']
+    else:
+        def db_operation():
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT name FROM students WHERE id=?", (student_id,))
+            student = c.fetchone()
+            return_db_connection(conn)
+            return student[0] if student else 'Student'
+        
+        future = executor.submit(db_operation)
+        try:
+            student_name = future.result(timeout=3)
+            session['student_name'] = student_name
+        except:
+            student_name = 'Student'
+    
+    return render_template('dashboard.html', student_name=student_name, student_id=student_id)
 
 @app.route('/admin')
 def admin():
@@ -385,16 +488,36 @@ def download_data():
 
 @app.route('/logout')
 def logout():
+    if 'student_id' in session:
+        track_user_session(session['student_id'], 'logout')
     session.clear()
     return redirect(url_for('index'))
+
+@app.route('/active_users')
+def active_users():
+    """Get count of active users (admin only)"""
+    if 'admin_logged_in' not in session:
+        return jsonify({'error': 'Unauthorized'})
+    
+    with session_lock:
+        active_count = len(active_sessions)
+        recent_logins = list(active_sessions.values())[-10:]  # Last 10 logins
+    
+    return jsonify({
+        'active_users': active_count,
+        'recent_logins': recent_logins,
+        'cache_size': len(login_cache)
+    })
 
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
-    print("🚀 Heavy Load Attendance System Starting...")
+    print("🚀 Multi-User Attendance System Starting...")
     print(f"⚡ Optimized for {batch_size} concurrent users")
     print(f"🔧 Thread pool: {executor._max_workers} workers")
-    print(f"💾 Connection pool: 10 connections")
+    print(f"💾 Connection pool: 20 connections")
+    print(f"💾 Login cache: {cache_timeout}s timeout")
+    print("👥 Multiple concurrent logins supported")
     print("🔑 Admin Password: Mayank#0069")
     
-    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)
+    app.run(debug=False, host='0.0.0.0', port=port, threaded=True, processes=1)

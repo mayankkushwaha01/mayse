@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: shambhunath_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: shambhunath_attendance
+      MYSQL_USER: attendance_user
+      MYSQL_PASSWORD: attendance_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-config:/etc/mysql/conf.d
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - attendance_network
+
+  app:
+    build: .
+    container_name: shambhunath_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: mysql
+      DB_USER: attendance_user
+      DB_PASSWORD: attendance_pass
+      DB_NAME: shambhunath_attendance
+      SESSION_SECRET: super_secret_session_key_2024
+      NODE_ENV: production
+    depends_on:
+      - mysql
+    networks:
+      - attendance_network
+    volumes:
+      - ./templates:/app/templates
+
+volumes:
+  mysql_data:
+
+networks:
+  attendance_network:
+    driver: bridge
