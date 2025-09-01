@@ -4,19 +4,98 @@ import hashlib
 from datetime import datetime, timedelta
 import uuid
 import os
+import threading
+import queue
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 app.secret_key = 'shambhunath_college_secret'
 
-def init_db():
-    conn = sqlite3.connect('/tmp/attendance.db')
+# Heavy load optimizations
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+
+# Thread pool for database operations
+executor = ThreadPoolExecutor(max_workers=20)
+
+# Connection pool
+connection_pool = queue.Queue(maxsize=10)
+for _ in range(10):
+    connection_pool.put(sqlite3.connect('/tmp/attendance.db', check_same_thread=False))
+
+# Batch processing
+batch_queue = queue.Queue()
+batch_size = 50
+batch_timeout = 2
+
+def get_db_connection():
+    try:
+        return connection_pool.get(timeout=2)
+    except queue.Empty:
+        return sqlite3.connect('/tmp/attendance.db', check_same_thread=False)
+
+def return_db_connection(conn):
+    try:
+        connection_pool.put(conn, timeout=1)
+    except queue.Full:
+        conn.close()
+
+def batch_processor():
+    while True:
+        batch = []
+        start_time = time.time()
+        
+        while len(batch) < batch_size and (time.time() - start_time) < batch_timeout:
+            try:
+                item = batch_queue.get(timeout=0.5)
+                batch.append(item)
+            except queue.Empty:
+                break
+        
+        if batch:
+            process_attendance_batch(batch)
+        time.sleep(0.1)
+
+def process_attendance_batch(batch):
+    conn = get_db_connection()
     c = conn.cursor()
+    
+    try:
+        attendance_data = [(item['student_id'], item['session_id'], item['timestamp']) for item in batch]
+        c.executemany("INSERT INTO attendance VALUES (?, ?, ?)", attendance_data)
+        conn.commit()
+        
+        for item in batch:
+            item['callback'](True)
+    except Exception as e:
+        for item in batch:
+            item['callback'](False)
+    finally:
+        return_db_connection(conn)
+
+# Start batch processor
+batch_thread = threading.Thread(target=batch_processor, daemon=True)
+batch_thread.start()
+
+def init_db():
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Optimized table creation with indexes
     c.execute('''CREATE TABLE IF NOT EXISTS students 
                  (id TEXT PRIMARY KEY, password TEXT, name TEXT)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_student_id ON students(id)''')
+    
     c.execute('''CREATE TABLE IF NOT EXISTS sessions 
                  (session_id TEXT PRIMARY KEY, created_at TEXT, expires_at TEXT, subject TEXT)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_session_expires ON sessions(expires_at)''')
+    
     c.execute('''CREATE TABLE IF NOT EXISTS attendance 
                  (student_id TEXT, session_id TEXT, timestamp TEXT)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(student_id)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_attendance_session ON attendance(session_id)''')
+    
     c.execute('''CREATE TABLE IF NOT EXISTS admin 
                  (username TEXT PRIMARY KEY, password TEXT)''')
     
@@ -25,7 +104,7 @@ def init_db():
     c.execute("INSERT INTO admin VALUES ('admin', ?)", (admin_pass,))
     
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
 @app.route('/')
 def index():
@@ -36,14 +115,20 @@ def login():
     student_id = request.form['student_id']
     password = hashlib.md5(request.form['password'].encode()).hexdigest()
     
-    conn = sqlite3.connect('/tmp/attendance.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM students WHERE id=? AND password=?", (student_id, password))
-    user = c.fetchone()
-    conn.close()
+    def db_operation():
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM students WHERE id=? AND password=?", (student_id, password))
+        user = c.fetchone()
+        return_db_connection(conn)
+        return user
+    
+    future = executor.submit(db_operation)
+    user = future.result(timeout=5)
     
     if user:
         session['student_id'] = student_id
+        session.permanent = True
         return redirect(url_for('dashboard'))
     return redirect(url_for('index'))
 
@@ -130,27 +215,50 @@ def mark_attendance():
     session_id = request.json['session_id']
     student_id = session['student_id']
     
-    conn = sqlite3.connect('/tmp/attendance.db')
+    # Validate session first
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT subject FROM sessions WHERE session_id=? AND datetime(expires_at) > datetime('now')", (session_id,))
     result = c.fetchone()
+    
     if not result:
-        conn.close()
+        return_db_connection(conn)
         return jsonify({'error': 'Session expired or invalid'})
     
     subject = result[0]
     
+    # Check if already marked
     c.execute("SELECT * FROM attendance WHERE student_id=? AND session_id=?", (student_id, session_id))
     if c.fetchone():
-        conn.close()
+        return_db_connection(conn)
         return jsonify({'error': 'Attendance already marked for this session'})
     
-    c.execute("INSERT INTO attendance VALUES (?, ?, ?)", 
-              (student_id, session_id, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
+    return_db_connection(conn)
     
-    return jsonify({'success': f'Attendance marked for {subject}'})
+    # Add to batch queue for processing
+    result_queue = queue.Queue()
+    
+    def callback(success):
+        result_queue.put(success)
+    
+    batch_item = {
+        'student_id': student_id,
+        'session_id': session_id,
+        'timestamp': datetime.now().isoformat(),
+        'callback': callback
+    }
+    
+    batch_queue.put(batch_item)
+    
+    # Wait for result
+    try:
+        success = result_queue.get(timeout=10)
+        if success:
+            return jsonify({'success': f'Attendance marked for {subject}'})
+        else:
+            return jsonify({'error': 'Failed to mark attendance'})
+    except queue.Empty:
+        return jsonify({'error': 'Request timeout'})
 
 @app.route('/get_current_session')
 def get_current_session():
@@ -283,4 +391,10 @@ def logout():
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    print("🚀 Heavy Load Attendance System Starting...")
+    print(f"⚡ Optimized for {batch_size} concurrent users")
+    print(f"🔧 Thread pool: {executor._max_workers} workers")
+    print(f"💾 Connection pool: 10 connections")
+    print("🔑 Admin Password: Mayank#0069")
+    
+    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)
